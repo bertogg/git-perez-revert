@@ -1,0 +1,241 @@
+#!/usr/bin/perl
+
+# git-perez-revert
+#
+# (c) 2018 Alberto Garcia <berto@debian.org>
+#
+# Este program revierte commits de un repositorio Git usando mensajes
+# basados en citas de Arturo Pérez-Reverte.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; version 2 dated June, 1991.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# http://www.gnu.org/licenses/gpl2.txt
+
+use strict;
+use warnings;
+
+my $editor = $ENV{_GIT_PEREZ_REVERT_EDITOR};
+my $exitcode;
+
+if (!$editor) {
+    # Ejecuta "git revert" usando este script (git-perez-revert) en
+    # lugar del editor de texto real. El nombre del editor real se
+    # pasa en _GIT_PEREZ_REVERT_EDITOR.
+    $ENV{_GIT_PEREZ_REVERT_EDITOR} = get_editor();
+    $ENV{GIT_EDITOR} = $0;
+    $exitcode = exec_process("git", "revert", @ARGV);
+} else {
+    # Modifica el mensaje de log producido por git-revert y después
+    # abre el editor real (_GIT_PEREZ_REVERT_EDITOR).
+    my $logfile = $ARGV[0];
+    open(FILE, $logfile);
+    my @lines = <FILE>;
+    close(FILE);
+
+    $lines[0] =~ s/^Revert /Revertido /;
+    $lines[2] =~ s/^This reverts commit /Esto revierte el commit /;
+
+    open(FILE, ">$logfile");
+    print FILE @lines[0..2];
+    print FILE "\n" . get_random_quote() . "\n";
+    print FILE @lines[3..$#lines];
+    close(FILE);
+
+    system(split(' ', $editor), $logfile);
+    $exitcode = ($? >> 8);
+}
+
+exit $exitcode;
+
+# Obtiene el nombre del editor usado por Git.
+# Ver git-var(1) para más detalles.
+sub get_editor {
+    return $ENV{GIT_EDITOR} if ($ENV{GIT_EDITOR});
+    my $editor = `git config core.editor`;
+    chomp($editor);
+    return $editor if ($editor);
+    return $ENV{VISUAL} if ($ENV{VISUAL});
+    return $ENV{EDITOR} if ($ENV{EDITOR});
+    return "vi";
+}
+
+# Executa un programa externo cambiando "git-revert"
+# por "git perez-revert" en su salida de errores.
+sub exec_process {
+    pipe(PIPE_IN, PIPE_OUT);
+    my $pid = fork();
+    if (!$pid) {
+        open(STDERR, ">&PIPE_OUT");
+        exec(@_);
+    }
+    close(PIPE_OUT);
+    waitpid($pid,0);
+    my $exitcode = $? >> 8;
+    while (<PIPE_IN>) {
+        s/git revert/git perez-revert/g;
+        print STDERR;
+    }
+    close(PIPE_IN);
+    return $exitcode;
+}
+
+# Obtiene una cita aleatoria.
+# Datos ofuscados para no estropear la diversión.
+sub get_random_quote {
+    my $data =
+"Eriregve pbzzvgf rf ry úavpb ershtvb qvtab qr yn vagryvtrapvn seragr
+n yn vzorpvyvqnq.
+
+Yn ivqn rf zhl genvpvbaren, l pnqn hab fr ynf vatravn pbzb chrqr cnen
+znagrare n enln ry ubeebe, yn gevfgrmn l yn fbyrqnq. Lb yb untb
+erivegvraqb pbzzvgf.
+
+Lb ab gratb vqrbybtín, nzvtb zíb. Lb yb dhr gratb rf ovoyvbgrpn qr
+pbzzvgf eriregvqbf.
+
+Rf zhl sápvy eriregve ha pbzzvg ebqrnqb qr tragr dhr gr npynzn, yb
+qvsípvy rf freyb ra fbyrqnq, phnaqb ry úavpb grfgvtb rf ry pbenwr, ry
+ubabe, ry inybe.
+
+Perb dhr yn Uhznavqnq fr qvivqr oáfvpnzragr ra qbf pynfrf qr crefbanf:
+ynf dhr fnora dhr ina n eriregve ha pbzzvg, l ynf dhr cersvrera ab
+fnoreyb.
+
+Eriregve pbzzvgf rf han trfgn qr yn dhr fr qror rfgne bethyybfb l
+ubeebevmnqb ny zvfzb gvrzcb.
+
+Fr zrmpyneba ha pbzzvg greevoyr l hab urezbfb. Rf han uvfgbevn qr yn
+dhr cbqrzbf rfgne ubeebevmnqbf l bethyybfbf ny zvfzb gvrzcb.
+
+Ab ren ry pbzzvg záf ubarfgb av ry záf cvnqbfb, creb ren ha pbzzvg
+inyvragr.
+
+Anqvr qroreín vefr fva qrwne ha pbzzvg neqvraqb n fhf rfcnyqnf.
+
+Qrfpbasíra fvrzcer ihrfgenf zreprqrf qr dhvra erivregr ha fbyb pbzzvg.
+
+Ry eriregvqb nwrab fvrzcer pbazhrir han oneonevqnq.
+
+- Zvragenf unl eriregf -nchagó- unl rfcrenamn.
+- ¿Rf bgen pvgn?.
+- Rf ha puvfgr znyb
+
+- Ab yr erivregb rfr pbzzvg.
+- Chrf erivfr hfgrq, fv rf gna nznoyr, fhf yízvgrf qr gbyrenapvn
+
+Unoín nceraqvqb dhr yb znyb ab ren yn rfcren, fvab ybf pbzzvgf dhr
+erivregrf zvragenf rfcrenf.
+
+Ovra zvenqb, ry zhaqb un qrwnqb qr crafne ra ybf eriregf. Perre dhr ab
+inzbf n eriregve abf unpr qéovyrf, l crberf.
+
+Anqn unl záf qrfcerpvnoyr, av cryvtebfb, dhr ha eriregvqbe qr pbzzvgf
+dhr pnqn abpur fr in n qbezve pba yn pbapvrapvn genadhvyn.
+
+Han zhwre crefcvpnm nqvivan ny crqnagr ra yn grepren senfr, l rf pncnm
+qr ire ry gnyragb qry dhr erivregr pbzzvgf ra fvyrapvb.
+
+Ybf rfcnñbyrf frthvzbf fvraqb ybf cevzrebf rarzvtbf qr abfbgebf
+zvfzbf. Rzcrñnqbf ra ab eriregve pbzzvgf nyyí qbaqr ybf irzbf snyyne.
+
+- ¿L rf pvregb rfb dhr qvpra? ¿Dhr ry pneápgre qr han zhwre fr zhrfgen
+  pba záf fvaprevqnq phnaqb erivregr ha pbzzvg?
+- N irprf. Creb ab záf dhr ry qr ha ubzoer
+
+Han zhwre ahapn rf fóyb han zhwre, dhrevqb Znk. Rf gnzovéa, l fboer
+gbqb, ybf eriregf dhr uvmb, dhr unpr l dhr cbqeín unpre. Avathan fr
+rkcyvpn fva ryybf.
+
+Ybf svyófbsbf tevrtbf graína enmóa ny qrpve dhr ry erireg ren yn znqer
+qr gbqnf ynf pbfnf.
+
+Nagr ha pbzzvg vasnzr rf ivy thneqne fvyrapvb, l rf qvtab erorynefr l
+eriregveyb.
+
+Ndhí fvrzcer fr una eriregvqb ybf zvfzbf pbzzvgf l qr znaren
+rdhvibpnqn.
+
+Perb ra ynf cvrqenf ivrwnf l ra ybf phnqebf bfphebf l ra ybf
+ngneqrprerf ebwvmbf fboer ry zne. L ra cnerwnf wóirarf dhr fr orfna. L
+ra pbzzvgf eriregvqbf.
+
+Fvrzcer qrfpbasíb qr dhvra ab gvrar rarzvtbf av pbzzvgf cnen eriregve.
+
+Eriregve rf ryrtve. Ryrtve rf neevrftnefr. Neevrftnefr rf cryrne.
+
+Rf greevoyr dhr tragr dhr ab gvrar yn zrabe phyghen, av yn zrabe
+zrzbevn; tragr dhr pnerpr qr ybf záf ryrzragnyrf pbabpvzvragbf
+uvfgóevpbf, shaqnzragnyrf cnen hfne Tvg, fr ngerin n ragene pbzb
+ryrsnagrf cbe pnpuneereín ra phrfgvbarf gna qryvpnqnf pbzb eriregve
+pbzzvgf, cnen ynf dhr unpr snygn zhpun phyghen, zhpub pbabpvzvragb l
+zhpun yhpvqrm.
+
+Phnaqb hab ir n ha navzny qr oryybgn, pba pbeongn sbfsbevgb b pba yb
+dhr yyrir, unoynaqb qr eriregve pbzzvgf fr certhagn hab ra znabf qr
+dhvéarf rfgnzbf.
+
+Ny svany n hab yb qreebgna fvrzcer. Perb dhr yn qreebgn rf nytb
+vaureragr n yn pbaqvpvóa uhznan, ny urpub qr ivive l qr cryrne. Cbe
+zhpub dhr iramnf, fvrzcer ny svany unl nythvra dhr gr qreebgn, fvrzcer
+unl ha Ebpebv, cbe zhpub dhr gevhasrf fvrzcer unl ha vproret rfcrenaqb
+ny Gvgnavp, fvrzcer unl ha erireg rfcrenaqb ny pbzzvg.
+
+Yb dhr unl dhr unpre rf rqhpne n ybf wóirarf, ab cnen rfr zhaqb ahrib
+l znenivyybfb dhr ahapn in n rkvfgve l dhr phnaqb fr raseragra n éy fr
+yrf pnvtn gbqb ry pnfgvyyb qr anvcrf, fvab cnen qrpveyrf dhr fvrzcer
+unl ha gfhanzv ra yn cynln cnenqvfínpn, dhr fvrzcer unl ha erireg ra
+pnqn pbzzvg.
+
+Lb ur ivfgb neqre zhpunf ovoyvbgrpnf, zhpunf pvhqnqrf obzoneqrnqnf, l
+ur ivfgb pbzzvgf ragrebf vefr ny pnenwb pba ncergne ha obgóa.
+
+Yb dhr cnfn qrfqr unpr nñbf rf dhr rfgnzbf creqvraqb yn zrzbevn b
+znavchyáaqbyn qr han znaren vasnzr hfnaqb eronfr b erfrg ra irm qr
+erireg.
+
+Ha ubzoer dhr ab erivregr pbzzvgf ab rf ha ubzoer. Hab nqdhvrer fh
+qvtavqnq raseragáaqbfr n ybf chagrebf ahybf, n ybf qrfobeqnzvragbf qr
+cvyn, ny póqvtb pba reeberf qr fvagnkvf, n ynf shtnf qr zrzbevn. Ry
+ubzoer gvrar yn boyvtnpvóa zbeny qr eriregve gbqbf ybf pbzzvgf
+artngvibf pba ybf dhr ry uvfgbevny qr Tvg yr ebqrn.
+
+Gbqniín unl gbagbf qry pvehryb -l gbagnf qry sehgny dhr pbeerfcbaqn-
+fbfgravraqb vzcregheonoyrf dhr unpre ha erireg ab rf crqntótvpb.
+
+Zv ercbfvgbevb un fvqb qrfbeqranqb l pbzcyvpnqb. Fr cnerpr, phnaqb
+zveb ngeáf, n han unovgnpvóa qbaqr rfgé gbqb erihrygb. Eriregve
+pbzzvgf rf han znaren qr beqrane pnwbarf l preeneybf. Ahapn rfgneá
+beqranqn qry gbqb yn unovgnpvóa, creb rfb yn unpr záf unovgnoyr.
+
+Ry erireg ab rf han ureenzvragn qr Tvg, fvab han pbzcnñín, ha ershtvb
+l ha ceblrpgb qr ivqn.
+
+Rfn npgvghq pboneqr qr ab dhrere eriregve pbzzvgf cnen ab perne
+cbyézvpn, qr ab neevrftnefr ahapn, ab zr thfgn anqn.
+
+Gratb yn cebshaqn pbaivppvóa qr dhr ab chrqr ragraqrefr anqn qr
+ahrfgeb cerfragr av qr ahrfgeb shgheb fv qrfpbabprzbf ahrfgeb cnfnqb,
+fv ryvzvanzbf pbzzvgf ra irm qr eriregveybf.
+
+Ab unl anqn záf crabfb dhr ha ubzoer b han zhwre dhr ab fnora eriregve
+ha pbzzvg.
+
+Fva tvg-ybt ab unl cbfvovyvqnq qr npbzrgre ry cerfragr. Ab gr chrqrf
+zbire cbe ry cerfragr, ab chrqrf npghne ra éy. Pbabpre ry tvg-ybt, fhf
+zrpnavfzbf qr naáyvfvf, qr pbzcerafvóa, gr qn yn fnovqheín qry
+gnoyreb. ¿Pózb gr ngerirf n eriregve pbzzvgf fva fnore ynf ertynf qry
+nwrqerm?
+";
+    $data =~ tr/A-Za-z/N-ZA-Mn-za-m/;
+    my @quotes = split('\n\n', $data);
+    my $randquote = $quotes[int(rand(@quotes))];
+    chomp($randquote);
+    return $randquote;
+}
